@@ -54,7 +54,7 @@ export default function MultiplayerPage() {
         .single();
 
       if (err || !data) { setError('Комната не найдена или уже занята'); return; }
-      router.push(`/multiplayer/${data.id}`);
+      router.push(`/multiplayer/${data.id}?code=${joinCode.toUpperCase()}`);
     } catch {
       setError('Не удалось подключиться. Проверьте код.');
     } finally {

@@ -58,39 +58,36 @@ export default function RoomPage({ params }: Props) {
       .on('broadcast', { event: 'left' }, () => {
         setOpponentConnected(false);
       })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED' && !isHost) {
-          // Update room status in DB so host gets notified even if broadcast is missed
+      .subscribe(async (subStatus) => {
+        if (subStatus === 'SUBSCRIBED' && !isHost) {
           await supabase.from('rooms').update({ status: 'playing' }).eq('id', roomId);
           channel.send({ type: 'broadcast', event: 'joined', payload: { player: myPlayer } });
+          // Retry a few times in case host missed it
+          setTimeout(() => channel.send({ type: 'broadcast', event: 'joined', payload: { player: myPlayer } }), 1500);
+          setTimeout(() => channel.send({ type: 'broadcast', event: 'joined', payload: { player: myPlayer } }), 4000);
         }
       });
 
     setChannelRef(channel);
 
-    // Host listens to DB changes as reliable fallback
+    // Host polls DB every 2s as reliable fallback
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
     if (isHost) {
-      const dbChannel = supabase
-        .channel(`room-db:${roomId}`)
-        .on('postgres_changes', {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'rooms',
-          filter: `id=eq.${roomId}`,
-        }, (payload: any) => {
-          if (payload.new?.status === 'playing') {
-            setOpponentConnected(true);
-            setStatus('playing');
-          }
-        })
-        .subscribe();
-
-      return () => {
-        channel.send({ type: 'broadcast', event: 'left', payload: {} });
-        supabase.removeChannel(channel);
-        supabase.removeChannel(dbChannel);
-      };
+      pollInterval = setInterval(async () => {
+        const { data } = await supabase.from('rooms').select('status').eq('id', roomId).single();
+        if (data?.status === 'playing') {
+          setOpponentConnected(true);
+          setStatus('playing');
+          if (pollInterval) clearInterval(pollInterval);
+        }
+      }, 2000);
     }
+
+    return () => {
+      channel.send({ type: 'broadcast', event: 'left', payload: {} });
+      supabase.removeChannel(channel);
+      if (pollInterval) clearInterval(pollInterval);
+    };
 
     return () => {
       channel.send({ type: 'broadcast', event: 'left', payload: {} });
