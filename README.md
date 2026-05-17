@@ -151,4 +151,4 @@ src/
 
 ---
 
-Создан для nFactorial School Hackathon 2025 🚀
+Создан для nFactorial Incubator 2026 🚀
