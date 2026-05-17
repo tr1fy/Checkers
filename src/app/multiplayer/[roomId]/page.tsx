@@ -113,7 +113,7 @@ export default function RoomPage({ params }: Props) {
       const won = (state.gameStatus === 'player1_wins' && myPlayer === 1) ||
                   (state.gameStatus === 'player2_wins' && myPlayer === 2);
       const { data: p } = await sb.from('profiles')
-        .select('rating, games_played, games_won, current_streak, best_streak')
+        .select('rating, games_played, games_won, current_streak, best_streak, last_win_date')
         .eq('id', user.id).single();
       if (p) {
         const newStreak = won ? (p.current_streak ?? 0) + 1 : 0;
