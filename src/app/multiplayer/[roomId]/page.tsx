@@ -46,7 +46,6 @@ export default function RoomPage({ params }: Props) {
 
     channel
       .on('broadcast', { event: 'move' }, ({ payload }) => {
-        // Apply opponent's move
         if (payload.player !== myPlayer) {
           const gameStore = useGameStore.getState();
           gameStore.makeMove(payload.move as Move);
@@ -59,12 +58,38 @@ export default function RoomPage({ params }: Props) {
       .on('broadcast', { event: 'left' }, () => {
         setOpponentConnected(false);
       })
-      .subscribe();
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED' && !isHost) {
+          // Update room status in DB so host gets notified even if broadcast is missed
+          await supabase.from('rooms').update({ status: 'playing' }).eq('id', roomId);
+          channel.send({ type: 'broadcast', event: 'joined', payload: { player: myPlayer } });
+        }
+      });
 
     setChannelRef(channel);
 
-    if (!isHost) {
-      channel.send({ type: 'broadcast', event: 'joined', payload: { player: myPlayer } });
+    // Host listens to DB changes as reliable fallback
+    if (isHost) {
+      const dbChannel = supabase
+        .channel(`room-db:${roomId}`)
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'rooms',
+          filter: `id=eq.${roomId}`,
+        }, (payload: any) => {
+          if (payload.new?.status === 'playing') {
+            setOpponentConnected(true);
+            setStatus('playing');
+          }
+        })
+        .subscribe();
+
+      return () => {
+        channel.send({ type: 'broadcast', event: 'left', payload: {} });
+        supabase.removeChannel(channel);
+        supabase.removeChannel(dbChannel);
+      };
     }
 
     return () => {
