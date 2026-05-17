@@ -1,9 +1,10 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Trophy, Users, User, Home, Zap } from 'lucide-react';
-import { motion } from 'framer-motion';
-import Image from 'next/image';
+import { Trophy, Users, User, Home, LogOut } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 const nav = [
   { href: '/', label: 'Главная', icon: <Home size={16} /> },
@@ -14,6 +15,22 @@ const nav = [
 
 export default function Header() {
   const pathname = usePathname();
+  const [user, setUser] = useState<SupabaseUser | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  async function handleSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    setUser(null);
+  }
 
   return (
     <header className="fixed top-0 left-0 right-0 z-30 border-b border-slate-800/50 bg-slate-950/80 backdrop-blur-xl">
@@ -53,13 +70,33 @@ export default function Header() {
 
         {/* Right side */}
         <div className="flex items-center gap-2">
-          <Link
-            href="/auth"
-            className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm text-slate-400 hover:text-white hover:bg-slate-800 transition-all border border-slate-700/50"
-          >
-            <User size={15} />
-            Войти
-          </Link>
+          {user ? (
+            <div className="hidden sm:flex items-center gap-2">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800/60 border border-slate-700/50">
+                <div className="w-6 h-6 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-xs font-bold text-amber-400">
+                  {(user.user_metadata?.full_name || user.email || 'U')[0].toUpperCase()}
+                </div>
+                <span className="text-sm text-slate-300 max-w-[120px] truncate">
+                  {user.user_metadata?.full_name || user.email?.split('@')[0]}
+                </span>
+              </div>
+              <button
+                onClick={handleSignOut}
+                className="p-2 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition-all"
+                title="Выйти"
+              >
+                <LogOut size={15} />
+              </button>
+            </div>
+          ) : (
+            <Link
+              href="/auth"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm text-slate-400 hover:text-white hover:bg-slate-800 transition-all border border-slate-700/50"
+            >
+              <User size={15} />
+              Войти
+            </Link>
+          )}
           <Link
             href="/play"
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-black font-bold text-sm hover:from-amber-400 hover:to-amber-500 transition-all shadow-md shadow-amber-500/20"
