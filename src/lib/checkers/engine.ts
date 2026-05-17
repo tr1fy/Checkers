@@ -55,6 +55,62 @@ function getCaptureChains(
   const result: Move[] = [];
   const dirs: [number, number][] = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
 
+  if (piece.type === 'king') {
+    for (const [dr, dc] of dirs) {
+      // Scan along diagonal; already-captured pieces are transparent
+      let scanRow = row + dr;
+      let scanCol = col + dc;
+      let opponentPos: Position | null = null;
+
+      while (inBounds(scanRow, scanCol)) {
+        const cell = board[scanRow][scanCol];
+        const alreadyCaptured = capturedSoFar.some(p => p.row === scanRow && p.col === scanCol);
+
+        if (cell === null || alreadyCaptured) {
+          scanRow += dr;
+          scanCol += dc;
+          continue;
+        }
+
+        if (cell.player !== piece.player) {
+          opponentPos = { row: scanRow, col: scanCol };
+        }
+        break;
+      }
+
+      if (!opponentPos) continue;
+
+      // King can land on any empty square beyond the captured piece
+      let landRow = opponentPos.row + dr;
+      let landCol = opponentPos.col + dc;
+
+      while (inBounds(landRow, landCol)) {
+        const landCell = board[landRow][landCol];
+        const alreadyCaptured = capturedSoFar.some(p => p.row === landRow && p.col === landCol);
+        const isOriginalFrom = landRow === from.row && landCol === from.col;
+        const alreadyVisited = visitedSquares.some(v => v.row === landRow && v.col === landCol);
+
+        if (!isOriginalFrom && !alreadyCaptured && landCell !== null) break;
+        if (!alreadyVisited) {
+          const newCaptured: Position[] = [...capturedSoFar, opponentPos];
+          const newVisited: Position[] = [...visitedSquares, { row: landRow, col: landCol }];
+          const continuations = getCaptureChains(board, landRow, landCol, newCaptured, newVisited, piece, from);
+
+          if (continuations.length > 0) {
+            result.push(...continuations);
+          } else {
+            result.push({ from, to: { row: landRow, col: landCol }, captures: newCaptured, isKingPromotion: false });
+          }
+        }
+
+        landRow += dr;
+        landCol += dc;
+      }
+    }
+    return result;
+  }
+
+  // Men (шашка): 1-square jump only
   for (const [dr, dc] of dirs) {
     const midRow = row + dr;
     const midCol = col + dc;
@@ -63,13 +119,10 @@ function getCaptureChains(
 
     if (!inBounds(toRow, toCol)) continue;
 
-    // Mid must be an uncaptured opponent piece
     const midCell = board[midRow][midCol];
     if (!midCell || midCell.player === piece.player) continue;
     if (capturedSoFar.some(p => p.row === midRow && p.col === midCol)) continue;
 
-    // Landing must be empty on original board — but allow the original FROM square
-    // (since the piece has logically left it) and block squares we've already passed through
     const isOriginalFrom = toRow === from.row && toCol === from.col;
     if (!isOriginalFrom) {
       if (board[toRow][toCol] !== null) continue;
@@ -99,6 +152,18 @@ function getCaptureChains(
 
 function getRegularMoves(board: Board, row: number, col: number, piece: Piece): Move[] {
   const moves: Move[] = [];
+  if (piece.type === 'king') {
+    // King slides along the entire diagonal
+    for (const [dr, dc] of [[-1,-1],[-1,1],[1,-1],[1,1]] as [number,number][]) {
+      let nr = row + dr, nc = col + dc;
+      while (inBounds(nr, nc) && board[nr][nc] === null) {
+        moves.push({ from: { row, col }, to: { row: nr, col: nc }, captures: [], isKingPromotion: false });
+        nr += dr;
+        nc += dc;
+      }
+    }
+    return moves;
+  }
   for (const [dr, dc] of moveDirs(piece)) {
     const nr = row + dr;
     const nc = col + dc;
