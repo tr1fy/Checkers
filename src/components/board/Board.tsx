@@ -32,7 +32,7 @@ export default function Board({ boardSkin = 'classic', pieceSkin = 'default' }: 
   function handleCellClick(row: number, col: number) {
     if (gameStatus !== 'playing') return;
     if (aiThinking) return;
-    if (mode === 'vs_ai' && currentPlayer !== humanPlayer) return;
+    if ((mode === 'vs_ai' || mode === 'multiplayer') && currentPlayer !== humanPlayer) return;
     selectPiece({ row, col });
   }
 

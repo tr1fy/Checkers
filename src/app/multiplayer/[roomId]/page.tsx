@@ -31,63 +31,58 @@ export default function RoomPage({ params }: Props) {
   const supabase = createClient();
 
   useEffect(() => {
-    // Initialize game state for this player
-    if (isHost) {
-      startGame('multiplayer', 'medium', myPlayer);
-    } else {
-      startGame('multiplayer', 'medium', myPlayer);
-      setStatus('playing');
-    }
+    startGame('multiplayer', 'medium', myPlayer);
+    if (!isHost) setStatus('playing');
 
-    // Subscribe to Supabase Realtime channel
     const channel = supabase.channel(`room:${roomId}`, {
-      config: { broadcast: { self: false } },
+      config: { broadcast: { self: false }, presence: { key: roomId } },
     });
 
     channel
       .on('broadcast', { event: 'move' }, ({ payload }) => {
         if (payload.player !== myPlayer) {
-          const gameStore = useGameStore.getState();
-          gameStore.makeMove(payload.move as Move);
+          useGameStore.getState().makeMove(payload.move as Move);
         }
       })
-      .on('broadcast', { event: 'joined' }, () => {
-        setOpponentConnected(true);
-        setStatus('playing');
+      .on('broadcast', { event: 'left' }, () => setOpponentConnected(false))
+      .on('presence', { event: 'join' }, ({ newPresences }: any) => {
+        // Host detects guest joining via Presence
+        if (isHost && newPresences.some((p: any) => p.role === 'guest')) {
+          setOpponentConnected(true);
+          setStatus('playing');
+        }
+        // Guest detects host is there
+        if (!isHost && newPresences.some((p: any) => p.role === 'host')) {
+          setOpponentConnected(true);
+        }
       })
-      .on('broadcast', { event: 'left' }, () => {
-        setOpponentConnected(false);
+      .on('presence', { event: 'leave' }, ({ leftPresences }: any) => {
+        const otherRole = isHost ? 'guest' : 'host';
+        if (leftPresences.some((p: any) => p.role === otherRole)) {
+          setOpponentConnected(false);
+        }
       })
       .subscribe(async (subStatus) => {
-        if (subStatus === 'SUBSCRIBED' && !isHost) {
+        if (subStatus !== 'SUBSCRIBED') return;
+        // Track own presence so opponent can detect us
+        await channel.track({ role: isHost ? 'host' : 'guest', player: myPlayer });
+
+        if (!isHost) {
+          // Guest also updates DB and sends broadcast as extra fallback
           await supabase.from('rooms').update({ status: 'playing' }).eq('id', roomId);
           channel.send({ type: 'broadcast', event: 'joined', payload: { player: myPlayer } });
-          // Retry a few times in case host missed it
-          setTimeout(() => channel.send({ type: 'broadcast', event: 'joined', payload: { player: myPlayer } }), 1500);
-          setTimeout(() => channel.send({ type: 'broadcast', event: 'joined', payload: { player: myPlayer } }), 4000);
+        } else {
+          // Host checks if guest already joined (in case of reconnect)
+          const state = channel.presenceState() as Record<string, any[]>;
+          const hasGuest = Object.values(state).flat().some((p: any) => p.role === 'guest');
+          if (hasGuest) {
+            setOpponentConnected(true);
+            setStatus('playing');
+          }
         }
       });
 
     setChannelRef(channel);
-
-    // Host polls DB every 2s as reliable fallback
-    let pollInterval: ReturnType<typeof setInterval> | null = null;
-    if (isHost) {
-      pollInterval = setInterval(async () => {
-        const { data } = await supabase.from('rooms').select('status').eq('id', roomId).single();
-        if (data?.status === 'playing') {
-          setOpponentConnected(true);
-          setStatus('playing');
-          if (pollInterval) clearInterval(pollInterval);
-        }
-      }, 2000);
-    }
-
-    return () => {
-      channel.send({ type: 'broadcast', event: 'left', payload: {} });
-      supabase.removeChannel(channel);
-      if (pollInterval) clearInterval(pollInterval);
-    };
 
     return () => {
       channel.send({ type: 'broadcast', event: 'left', payload: {} });
