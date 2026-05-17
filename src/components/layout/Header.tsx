@@ -72,14 +72,14 @@ export default function Header() {
         <div className="flex items-center gap-2">
           {user ? (
             <div className="hidden sm:flex items-center gap-2">
-              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800/60 border border-slate-700/50">
+              <Link href="/profile" className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800/60 border border-slate-700/50 hover:border-amber-500/40 transition-colors">
                 <div className="w-6 h-6 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-xs font-bold text-amber-400">
                   {(user.user_metadata?.full_name || user.email || 'U')[0].toUpperCase()}
                 </div>
                 <span className="text-sm text-slate-300 max-w-[120px] truncate">
                   {user.user_metadata?.full_name || user.email?.split('@')[0]}
                 </span>
-              </div>
+              </Link>
               <button
                 onClick={handleSignOut}
                 className="p-2 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition-all"

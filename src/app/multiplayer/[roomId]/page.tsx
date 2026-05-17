@@ -112,12 +112,18 @@ export default function RoomPage({ params }: Props) {
       if (!user) return;
       const won = (state.gameStatus === 'player1_wins' && myPlayer === 1) ||
                   (state.gameStatus === 'player2_wins' && myPlayer === 2);
-      const { data: profile } = await sb.from('profiles').select('rating, games_played, games_won').eq('id', user.id).single();
-      if (profile) {
+      const { data: p } = await sb.from('profiles')
+        .select('rating, games_played, games_won, current_streak, best_streak')
+        .eq('id', user.id).single();
+      if (p) {
+        const newStreak = won ? (p.current_streak ?? 0) + 1 : 0;
         await sb.from('profiles').update({
-          rating: Math.max(0, profile.rating + (won ? 25 : -20)),
-          games_played: profile.games_played + 1,
-          games_won: won ? profile.games_won + 1 : profile.games_won,
+          rating: Math.max(0, p.rating + (won ? 25 : -20)),
+          games_played: p.games_played + 1,
+          games_won: won ? p.games_won + 1 : p.games_won,
+          current_streak: newStreak,
+          best_streak: Math.max(p.best_streak ?? 0, newStreak),
+          last_win_date: won ? new Date().toISOString().split('T')[0] : p.last_win_date,
         }).eq('id', user.id);
       }
     };
