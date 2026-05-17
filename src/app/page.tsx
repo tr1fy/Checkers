@@ -230,7 +230,7 @@ export default function HomePage() {
 
             {/* Footer */}
             <footer className="border-t border-slate-800/50 py-8 px-4 text-center text-slate-600 text-sm">
-              <p>© 2025 Checkers. Создан с ❤️ для nFactorial School.</p>
+              <p>© 2026 Checkers. Создан с ❤️ Bolat Bekzhan.</p>
             </footer>
           </motion.div>
         )}

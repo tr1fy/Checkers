@@ -37,7 +37,7 @@ export default function Board({ boardSkin = 'classic', pieceSkin = 'default' }: 
   }
 
   return (
-    <div className="relative select-none">
+    <div className="relative select-none w-full">
       {/* Board shadow/frame */}
       <div
         className="rounded-2xl overflow-hidden p-3"

@@ -6,29 +6,10 @@ import Header from '@/components/layout/Header';
 import { createClient } from '@/lib/supabase/client';
 import { LeaderboardEntry } from '@/types/checkers';
 
-// Mock data for when Supabase is not configured
-const MOCK_DATA: LeaderboardEntry[] = [
-  { id: '1', username: 'DragonSlayer', avatar_url: null, city: 'Алматы', rating: 2450, games_played: 342, games_won: 290 },
-  { id: '2', username: 'CheckerKing99', avatar_url: null, city: 'Астана', rating: 2380, games_played: 218, games_won: 178 },
-  { id: '3', username: 'StrategistPro', avatar_url: null, city: 'Алматы', rating: 2310, games_played: 405, games_won: 318 },
-  { id: '4', username: 'DiagonalMaster', avatar_url: null, city: 'Шымкент', rating: 2275, games_played: 189, games_won: 144 },
-  { id: '5', username: 'NightOwlPlayer', avatar_url: null, city: 'Астана', rating: 2190, games_played: 267, games_won: 198 },
-  { id: '6', username: 'CrownHunter', avatar_url: null, city: null, rating: 2155, games_played: 156, games_won: 112 },
-  { id: '7', username: 'QueueSniper', avatar_url: null, city: 'Алматы', rating: 2120, games_played: 298, games_won: 210 },
-  { id: '8', username: 'StealthMover', avatar_url: null, city: 'Бишкек', rating: 2090, games_played: 445, games_won: 301 },
-  { id: '9', username: 'GrandMasterX', avatar_url: null, city: 'Ташкент', rating: 2050, games_played: 512, games_won: 340 },
-  { id: '10', username: 'ThunderPawn', avatar_url: null, city: 'Астана', rating: 1980, games_played: 167, games_won: 108 },
-  { id: '11', username: 'CalmMind', avatar_url: null, city: 'Алматы', rating: 1945, games_played: 234, games_won: 151 },
-  { id: '12', username: 'RapidJumper', avatar_url: null, city: null, rating: 1920, games_played: 188, games_won: 120 },
-  { id: '13', username: 'Volkov_S', avatar_url: null, city: 'Москва', rating: 1895, games_played: 523, games_won: 333 },
-  { id: '14', username: 'PieceByPiece', avatar_url: null, city: 'Алматы', rating: 1870, games_played: 145, games_won: 90 },
-  { id: '15', username: 'IronDefense', avatar_url: null, city: 'Астана', rating: 1840, games_played: 278, games_won: 170 },
-];
-
 const CITIES = ['Все города', 'Алматы', 'Астана', 'Шымкент', 'Бишкек', 'Ташкент', 'Москва'];
 
 export default function LeaderboardPage() {
-  const [entries, setEntries] = useState<LeaderboardEntry[]>(MOCK_DATA);
+  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [filter, setFilter] = useState('Все города');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
