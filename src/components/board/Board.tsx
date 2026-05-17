@@ -15,13 +15,17 @@ const boardSkins: Record<BoardSkin, { light: string; dark: string; border: strin
 interface BoardProps {
   boardSkin?: BoardSkin;
   pieceSkin?: PieceSkin;
+  flipped?: boolean;
 }
 
-export default function Board({ boardSkin = 'classic', pieceSkin = 'default' }: BoardProps) {
+export default function Board({ boardSkin = 'classic', pieceSkin = 'default', flipped = false }: BoardProps) {
   const { state, selectPiece, aiThinking, humanPlayer, mode } = useGameStore();
   const { board, selectedPos, validMoves, currentPlayer, gameStatus } = state;
 
   const skin = boardSkins[boardSkin];
+  const rowOrder = flipped ? [7,6,5,4,3,2,1,0] : [0,1,2,3,4,5,6,7];
+  const colOrder = flipped ? [7,6,5,4,3,2,1,0] : [0,1,2,3,4,5,6,7];
+  const colLabels = flipped ? ['h','g','f','e','d','c','b','a'] : ['a','b','c','d','e','f','g','h'];
 
   const validDests = new Set(validMoves.map(m => `${m.to.row},${m.to.col}`));
   const selectedMoves = selectedPos
@@ -46,7 +50,7 @@ export default function Board({ boardSkin = 'classic', pieceSkin = 'default' }: 
         {/* Row labels */}
         <div className="grid grid-cols-[20px_1fr] gap-0">
           <div className="flex flex-col justify-around py-1">
-            {[0,1,2,3,4,5,6,7].map(r => (
+            {rowOrder.map(r => (
               <div key={r} className="text-xs text-amber-200/60 text-center h-[calc(100%/8)] flex items-center justify-center" style={{ height: '12.5%' }}>
                 {8 - r}
               </div>
@@ -56,7 +60,7 @@ export default function Board({ boardSkin = 'classic', pieceSkin = 'default' }: 
           <div>
             {/* Col labels top */}
             <div className="grid grid-cols-8 mb-1">
-              {['a','b','c','d','e','f','g','h'].map(c => (
+              {colLabels.map(c => (
                 <div key={c} className="text-xs text-amber-200/60 text-center">{c}</div>
               ))}
             </div>
@@ -66,8 +70,9 @@ export default function Board({ boardSkin = 'classic', pieceSkin = 'default' }: 
               className="grid grid-cols-8"
               style={{ border: `2px solid ${skin.border}` }}
             >
-              {board.map((row, rIdx) =>
-                row.map((cell, cIdx) => {
+              {rowOrder.map(rIdx =>
+                colOrder.map(cIdx => {
+                  const cell = board[rIdx][cIdx];
                   const isLight = (rIdx + cIdx) % 2 === 0;
                   const isSelected = selectedPos?.row === rIdx && selectedPos?.col === cIdx;
                   const isValidDest = selectedDests.has(`${rIdx},${cIdx}`);

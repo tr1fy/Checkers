@@ -112,24 +112,6 @@ export default function HomePage() {
                   </Link>
                 </motion.div>
 
-                {/* Stats bar */}
-                <motion.div
-                  className="flex flex-wrap gap-8 justify-center text-center"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.7 }}
-                >
-                  {[
-                    { label: 'Игроков онлайн', value: '1,247' },
-                    { label: 'Партий сыграно', value: '89,412' },
-                    { label: 'Стран', value: '47' },
-                  ].map((s, i) => (
-                    <div key={i}>
-                      <div className="text-2xl font-black text-amber-400">{s.value}</div>
-                      <div className="text-sm text-slate-500">{s.label}</div>
-                    </div>
-                  ))}
-                </motion.div>
               </div>
             </section>
 

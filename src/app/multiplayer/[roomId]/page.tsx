@@ -55,8 +55,9 @@ export default function RoomPage({ params }: Props) {
         }
       })
       .on('broadcast', { event: 'ping' }, () => {
-        // Guest receives ping from host → respond with pong
+        // Guest receives ping from host → host is connected, respond
         if (!isHost) {
+          setOpponentConnected(true);
           channel.send({ type: 'broadcast', event: 'pong', payload: {} });
         }
       })
@@ -101,6 +102,27 @@ export default function RoomPage({ params }: Props) {
   const handleCellClick = useCallback(() => {
     // Move broadcasting is handled in store override below
   }, []);
+
+  // Rating update after game ends
+  useEffect(() => {
+    if (state.gameStatus === 'playing' || status !== 'playing') return;
+    const updateRating = async () => {
+      const sb = createClient();
+      const { data: { user } } = await sb.auth.getUser();
+      if (!user) return;
+      const won = (state.gameStatus === 'player1_wins' && myPlayer === 1) ||
+                  (state.gameStatus === 'player2_wins' && myPlayer === 2);
+      const { data: profile } = await sb.from('profiles').select('rating, games_played, games_won').eq('id', user.id).single();
+      if (profile) {
+        await sb.from('profiles').update({
+          rating: Math.max(0, profile.rating + (won ? 25 : -20)),
+          games_played: profile.games_played + 1,
+          games_won: won ? profile.games_won + 1 : profile.games_won,
+        }).eq('id', user.id);
+      }
+    };
+    updateRating();
+  }, [state.gameStatus, status]);
 
   // Patch: intercept moves via store subscription
   useEffect(() => {
@@ -207,7 +229,7 @@ export default function RoomPage({ params }: Props) {
             {/* Game */}
             <div className="flex flex-col lg:flex-row gap-6 items-start justify-center">
               <div className="flex-shrink-0" style={{ width: 'min(90vw, 560px)' }}>
-                <Board />
+                <Board flipped={myPlayer === 1} />
               </div>
               <GamePanel />
             </div>
