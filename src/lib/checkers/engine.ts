@@ -41,11 +41,14 @@ function moveDirs(piece: Piece): [number, number][] {
   return piece.player === 1 ? [[1, -1], [1, 1]] : [[-1, -1], [-1, 1]];
 }
 
+// NO board cloning — uses position tracking for visited squares instead.
+// This is the key performance fix: cloning 8x8 boards recursively was the RAM killer.
 function getCaptureChains(
   board: Board,
   row: number,
   col: number,
   capturedSoFar: Position[],
+  visitedSquares: Position[],
   piece: Piece,
   from: Position
 ): Move[] {
@@ -60,15 +63,20 @@ function getCaptureChains(
 
     if (!inBounds(toRow, toCol)) continue;
 
+    // Mid must be an uncaptured opponent piece
     const midCell = board[midRow][midCol];
     if (!midCell || midCell.player === piece.player) continue;
     if (capturedSoFar.some(p => p.row === midRow && p.col === midCol)) continue;
 
-    const dest = board[toRow][toCol];
-    const isOriginalSquare = toRow === from.row && toCol === from.col;
-    if (dest !== null && !isOriginalSquare) continue;
+    // Landing must be empty on original board — but allow the original FROM square
+    // (since the piece has logically left it) and block squares we've already passed through
+    const isOriginalFrom = toRow === from.row && toCol === from.col;
+    if (!isOriginalFrom) {
+      if (board[toRow][toCol] !== null) continue;
+      if (visitedSquares.some(v => v.row === toRow && v.col === toCol)) continue;
+    }
 
-    const newCaptured = [...capturedSoFar, { row: midRow, col: midCol }];
+    const newCaptured: Position[] = [...capturedSoFar, { row: midRow, col: midCol }];
     const becameKing = wouldBeKing(piece, toRow);
 
     if (becameKing) {
@@ -76,11 +84,9 @@ function getCaptureChains(
       continue;
     }
 
-    const tempBoard = cloneBoard(board);
-    tempBoard[toRow][toCol] = { ...piece };
-    tempBoard[row][col] = null;
+    const newVisited: Position[] = [...visitedSquares, { row: toRow, col: toCol }];
+    const continuations = getCaptureChains(board, toRow, toCol, newCaptured, newVisited, piece, from);
 
-    const continuations = getCaptureChains(tempBoard, toRow, toCol, newCaptured, piece, from);
     if (continuations.length > 0) {
       result.push(...continuations);
     } else {
@@ -116,17 +122,13 @@ export function getAllMoves(board: Board, player: Player): Move[] {
     for (let c = 0; c < 8; c++) {
       const piece = board[r][c];
       if (!piece || piece.player !== player) continue;
-      captures.push(...getCaptureChains(board, r, c, [], piece, { row: r, col: c }));
+      const from: Position = { row: r, col: c };
+      captures.push(...getCaptureChains(board, r, c, [], [from], piece, from));
       regulars.push(...getRegularMoves(board, r, c, piece));
     }
   }
 
   return captures.length > 0 ? captures : regulars;
-}
-
-export function getMovesForPiece(board: Board, row: number, col: number, player: Player): Move[] {
-  const allMoves = getAllMoves(board, player);
-  return allMoves.filter(m => m.from.row === row && m.from.col === col);
 }
 
 export function applyMove(board: Board, move: Move): Board {
@@ -149,17 +151,16 @@ export function checkGameStatus(board: Board, currentPlayer: Player): GameStatus
     return currentPlayer === 1 ? 'player2_wins' : 'player1_wins';
   }
 
-  let p1Count = 0;
-  let p2Count = 0;
+  let p1 = 0, p2 = 0;
   for (const row of board) {
     for (const cell of row) {
-      if (cell?.player === 1) p1Count++;
-      if (cell?.player === 2) p2Count++;
+      if (cell?.player === 1) p1++;
+      if (cell?.player === 2) p2++;
     }
   }
 
-  if (p1Count === 0) return 'player2_wins';
-  if (p2Count === 0) return 'player1_wins';
+  if (p1 === 0) return 'player2_wins';
+  if (p2 === 0) return 'player1_wins';
 
   return 'playing';
 }

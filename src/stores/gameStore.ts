@@ -1,7 +1,7 @@
 'use client';
 import { create } from 'zustand';
 import { Board, Difficulty, GameMode, GameState, GameStatus, Move, Player, Position } from '@/types/checkers';
-import { initBoard, getAllMoves, getMovesForPiece, applyMove, checkGameStatus, getOpponent } from '@/lib/checkers/engine';
+import { initBoard, getAllMoves, applyMove, checkGameStatus, getOpponent } from '@/lib/checkers/engine';
 import { getBestMove } from '@/lib/checkers/ai';
 
 interface GameStore {
