@@ -28,15 +28,17 @@ export default function RoomPage({ params }: Props) {
   const [channelRef, setChannelRef] = useState<any>(null);
   const [opponentConnected, setOpponentConnected] = useState(false);
 
-  const supabase = createClient();
-
   useEffect(() => {
     startGame('multiplayer', 'medium', myPlayer);
     if (!isHost) setStatus('playing');
 
-    const channel = supabase.channel(`room:${roomId}`, {
-      config: { broadcast: { self: false }, presence: { key: roomId } },
+    const sb = createClient();
+    const channel = sb.channel(`room:${roomId}`, {
+      config: { broadcast: { self: false } },
     });
+
+    let pingInterval: ReturnType<typeof setInterval> | null = null;
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
 
     channel
       .on('broadcast', { event: 'move' }, ({ payload }) => {
@@ -44,41 +46,44 @@ export default function RoomPage({ params }: Props) {
           useGameStore.getState().makeMove(payload.move as Move);
         }
       })
-      .on('broadcast', { event: 'left' }, () => setOpponentConnected(false))
-      .on('presence', { event: 'join' }, ({ newPresences }: any) => {
-        // Host detects guest joining via Presence
-        if (isHost && newPresences.some((p: any) => p.role === 'guest')) {
+      .on('broadcast', { event: 'pong' }, () => {
+        // Host receives pong from guest → start game
+        if (isHost) {
           setOpponentConnected(true);
           setStatus('playing');
-        }
-        // Guest detects host is there
-        if (!isHost && newPresences.some((p: any) => p.role === 'host')) {
-          setOpponentConnected(true);
+          if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
         }
       })
-      .on('presence', { event: 'leave' }, ({ leftPresences }: any) => {
-        const otherRole = isHost ? 'guest' : 'host';
-        if (leftPresences.some((p: any) => p.role === otherRole)) {
-          setOpponentConnected(false);
+      .on('broadcast', { event: 'ping' }, () => {
+        // Guest receives ping from host → respond with pong
+        if (!isHost) {
+          channel.send({ type: 'broadcast', event: 'pong', payload: {} });
         }
       })
+      .on('broadcast', { event: 'left' }, () => setOpponentConnected(false))
       .subscribe(async (subStatus) => {
         if (subStatus !== 'SUBSCRIBED') return;
-        // Track own presence so opponent can detect us
-        await channel.track({ role: isHost ? 'host' : 'guest', player: myPlayer });
 
-        if (!isHost) {
-          // Guest also updates DB and sends broadcast as extra fallback
-          await supabase.from('rooms').update({ status: 'playing' }).eq('id', roomId);
-          channel.send({ type: 'broadcast', event: 'joined', payload: { player: myPlayer } });
+        if (isHost) {
+          // Host pings every 1.5s, guest responds with pong
+          pingInterval = setInterval(() => {
+            channel.send({ type: 'broadcast', event: 'ping', payload: {} });
+          }, 1500);
+
+          // Also poll DB as backup
+          pollInterval = setInterval(async () => {
+            const { data } = await sb.from('rooms').select('status').eq('id', roomId).maybeSingle();
+            if (data?.status === 'playing') {
+              setOpponentConnected(true);
+              setStatus('playing');
+              if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
+              if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+            }
+          }, 3000);
         } else {
-          // Host checks if guest already joined (in case of reconnect)
-          const state = channel.presenceState() as Record<string, any[]>;
-          const hasGuest = Object.values(state).flat().some((p: any) => p.role === 'guest');
-          if (hasGuest) {
-            setOpponentConnected(true);
-            setStatus('playing');
-          }
+          // Guest: update DB status and immediately send pong
+          await sb.from('rooms').update({ status: 'playing' }).eq('id', roomId);
+          channel.send({ type: 'broadcast', event: 'pong', payload: {} });
         }
       });
 
@@ -86,7 +91,9 @@ export default function RoomPage({ params }: Props) {
 
     return () => {
       channel.send({ type: 'broadcast', event: 'left', payload: {} });
-      supabase.removeChannel(channel);
+      sb.removeChannel(channel);
+      if (pingInterval) clearInterval(pingInterval);
+      if (pollInterval) clearInterval(pollInterval);
     };
   }, [roomId]);
 
