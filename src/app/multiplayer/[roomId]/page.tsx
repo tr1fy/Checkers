@@ -182,7 +182,7 @@ export default function RoomPage({ params }: Props) {
 
             {/* Game */}
             <div className="flex flex-col lg:flex-row gap-6 items-start justify-center">
-              <div className="w-full lg:w-auto flex-shrink-0" style={{ maxWidth: 'min(90vw, 600px)' }}>
+              <div className="flex-shrink-0" style={{ width: 'min(90vw, 560px)' }}>
                 <Board />
               </div>
               <GamePanel />

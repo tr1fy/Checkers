@@ -30,7 +30,7 @@ export default function MultiplayerPage() {
         .single();
 
       if (err) throw err;
-      router.push(`/multiplayer/${data.id}?host=1`);
+      router.push(`/multiplayer/${data.id}?host=1&code=${code}`);
     } catch (e: any) {
       // Fallback: create local room ID without DB
       const fakeId = `local-${generateCode()}`;
